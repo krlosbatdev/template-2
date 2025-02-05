@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { VINFormData } from '@/types/vin';
-import Navbar from './Navbar';
 
 export default function AddVIN() {
     const router = useRouter();
@@ -86,134 +85,125 @@ export default function AddVIN() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-100">
-            <div className="max-w-[1200px] mx-auto p-4">
-                <div className="bg-white rounded-2xl">
-                    <Navbar />
+        <div className="p-6">
+            <div className="max-w-[512px]">
+                <h3 className="text-[32px] font-bold text-gray-900 mb-2">
+                    Add a VIN to your watchlist
+                </h3>
+                <p className="text-gray-500 text-base mb-6">
+                    Enter the 17-character VIN of the vehicle you would like to add to your watchlist.
+                    {!showAdditionalFields && " The vehicle information will be automatically populated when you enter a valid VIN."}
+                </p>
 
-                    {/* Content */}
-                    <div className="p-6">
-                        <div className="max-w-[512px]">
-                            <h3 className="text-[32px] font-bold text-gray-900 mb-2">
-                                Add a VIN to your watchlist
-                            </h3>
-                            <p className="text-gray-500 text-base mb-6">
-                                Enter the 17-character VIN of the vehicle you would like to add to your watchlist.
-                                {!showAdditionalFields && " The vehicle information will be automatically populated when you enter a valid VIN."}
-                            </p>
-
-                            {error && (
-                                <div className="mb-4 p-3 rounded-xl bg-red-50 text-red-500 text-sm">
-                                    {error}
-                                </div>
-                            )}
-
-                            <form onSubmit={handleSubmit} className="space-y-6">
-                                <div>
-                                    <label className="block">
-                                        <span className="text-gray-900 text-base font-medium mb-2 block">VIN</span>
-                                        <div className="relative">
-                                            <input
-                                                name="vin"
-                                                value={formData.vin}
-                                                onChange={handleVinChange}
-                                                placeholder="1HGBH41JXMN109186"
-                                                className="w-full rounded-xl border border-gray-200 bg-slate-50 h-14 px-4 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                required
-                                                pattern="^[A-HJ-NPR-Z0-9]{17}$"
-                                                title="Please enter a valid 17-character VIN"
-                                            />
-                                            {loading && (
-                                                <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </label>
-                                </div>
-
-                                {showAdditionalFields && (
-                                    <>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <label className="block">
-                                                <span className="text-gray-900 text-base font-medium mb-2 block">Year</span>
-                                                <input
-                                                    name="year"
-                                                    value={formData.year}
-                                                    onChange={handleChange}
-                                                    placeholder="2021"
-                                                    className="w-full rounded-xl border border-gray-200 bg-slate-50 h-14 px-4 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    pattern="^(19|20)\d{2}$"
-                                                    title="Please enter a valid year (1900-2099)"
-                                                />
-                                            </label>
-                                            <label className="block">
-                                                <span className="text-gray-900 text-base font-medium mb-2 block">Make</span>
-                                                <input
-                                                    name="make"
-                                                    value={formData.make}
-                                                    onChange={handleChange}
-                                                    placeholder="Toyota"
-                                                    className="w-full rounded-xl border border-gray-200 bg-slate-50 h-14 px-4 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                />
-                                            </label>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <label className="block">
-                                                <span className="text-gray-900 text-base font-medium mb-2 block">Model</span>
-                                                <input
-                                                    name="model"
-                                                    value={formData.model}
-                                                    onChange={handleChange}
-                                                    placeholder="Camry"
-                                                    className="w-full rounded-xl border border-gray-200 bg-slate-50 h-14 px-4 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                />
-                                            </label>
-                                            <label className="block">
-                                                <span className="text-gray-900 text-base font-medium mb-2 block">Color</span>
-                                                <input
-                                                    name="color"
-                                                    value={formData.color}
-                                                    onChange={handleChange}
-                                                    placeholder="White"
-                                                    className="w-full rounded-xl border border-gray-200 bg-slate-50 h-14 px-4 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                />
-                                            </label>
-                                        </div>
-                                    </>
-                                )}
-
-                                <div className="flex justify-end gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => router.push('/vins')}
-                                        className="rounded-xl px-4 h-10 bg-slate-50 text-gray-900 text-sm font-medium hover:bg-slate-100"
-                                        disabled={loading}
-                                    >
-                                        Cancel
-                                    </button>
-                                    {showAdditionalFields && (
-                                        <button
-                                            type="submit"
-                                            className="rounded-xl px-4 h-10 bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                                            disabled={loading}
-                                        >
-                                            {loading ? (
-                                                <div className="flex items-center gap-2">
-                                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                                    <span>Saving...</span>
-                                                </div>
-                                            ) : (
-                                                'Save VIN'
-                                            )}
-                                        </button>
-                                    )}
-                                </div>
-                            </form>
-                        </div>
+                {error && (
+                    <div className="mb-4 p-3 rounded-xl bg-red-50 text-red-500 text-sm">
+                        {error}
                     </div>
-                </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div>
+                        <label className="block">
+                            <span className="text-gray-900 text-base font-medium mb-2 block">VIN</span>
+                            <div className="relative">
+                                <input
+                                    name="vin"
+                                    value={formData.vin}
+                                    onChange={handleVinChange}
+                                    placeholder="1HGBH41JXMN109186"
+                                    className="w-full rounded-xl border border-gray-200 bg-slate-50 h-14 px-4 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    required
+                                    pattern="^[A-HJ-NPR-Z0-9]{17}$"
+                                    title="Please enter a valid 17-character VIN"
+                                />
+                                {loading && (
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                                    </div>
+                                )}
+                            </div>
+                        </label>
+                    </div>
+
+                    {showAdditionalFields && (
+                        <>
+                            <div className="grid grid-cols-2 gap-4">
+                                <label className="block">
+                                    <span className="text-gray-900 text-base font-medium mb-2 block">Year</span>
+                                    <input
+                                        name="year"
+                                        value={formData.year}
+                                        onChange={handleChange}
+                                        placeholder="2021"
+                                        className="w-full rounded-xl border border-gray-200 bg-slate-50 h-14 px-4 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        pattern="^(19|20)\d{2}$"
+                                        title="Please enter a valid year (1900-2099)"
+                                    />
+                                </label>
+                                <label className="block">
+                                    <span className="text-gray-900 text-base font-medium mb-2 block">Make</span>
+                                    <input
+                                        name="make"
+                                        value={formData.make}
+                                        onChange={handleChange}
+                                        placeholder="Toyota"
+                                        className="w-full rounded-xl border border-gray-200 bg-slate-50 h-14 px-4 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </label>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <label className="block">
+                                    <span className="text-gray-900 text-base font-medium mb-2 block">Model</span>
+                                    <input
+                                        name="model"
+                                        value={formData.model}
+                                        onChange={handleChange}
+                                        placeholder="Camry"
+                                        className="w-full rounded-xl border border-gray-200 bg-slate-50 h-14 px-4 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </label>
+                                <label className="block">
+                                    <span className="text-gray-900 text-base font-medium mb-2 block">Color</span>
+                                    <input
+                                        name="color"
+                                        value={formData.color}
+                                        onChange={handleChange}
+                                        placeholder="White"
+                                        className="w-full rounded-xl border border-gray-200 bg-slate-50 h-14 px-4 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </label>
+                            </div>
+                        </>
+                    )}
+
+                    <div className="flex justify-end gap-3">
+                        <button
+                            type="button"
+                            onClick={() => router.push('/vins')}
+                            className="rounded-xl px-4 h-10 bg-slate-50 text-gray-900 text-sm font-medium hover:bg-slate-100"
+                            disabled={loading}
+                        >
+                            Cancel
+                        </button>
+                        {showAdditionalFields && (
+                            <button
+                                type="submit"
+                                className="rounded-xl px-4 h-10 bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <div className="flex items-center gap-2">
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                        <span>Saving...</span>
+                                    </div>
+                                ) : (
+                                    'Save VIN'
+                                )}
+                            </button>
+                        )}
+                    </div>
+                </form>
             </div>
         </div>
     );

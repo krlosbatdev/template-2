@@ -6,10 +6,13 @@ import { Spinner } from '@/app/components/Spinner'
 
 interface ListingInfo {
     vin: string
-    platform: string
     title: string
     date: string
-    url?: string
+    url?: string | null
+    price?: number
+    miles?: number
+    location?: string
+    source?: string
 }
 
 export default function DashboardTable() {
@@ -23,6 +26,9 @@ export default function DashboardTable() {
             const response = await fetch('/api/listings/search', {
                 method: 'GET',
             })
+            if (!response.ok) {
+                throw new Error('Failed to fetch listings')
+            }
             const data = await response.json()
             setListings(data)
         } catch (error) {
@@ -37,6 +43,20 @@ export default function DashboardTable() {
         return listing.vin.toLowerCase().includes(searchLower) ||
             listing.title.toLowerCase().includes(searchLower)
     })
+
+    const formatPrice = (price?: number) => {
+        if (!price) return 'N/A'
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            maximumFractionDigits: 0
+        }).format(price)
+    }
+
+    const formatMiles = (miles?: number) => {
+        if (!miles) return 'N/A'
+        return new Intl.NumberFormat('en-US').format(miles) + ' mi'
+    }
 
     return (
         <div>
@@ -80,7 +100,19 @@ export default function DashboardTable() {
                                 VIN
                             </th>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Title
+                                Vehicle
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Price
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Miles
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Location
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Source
                             </th>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Date
@@ -98,6 +130,18 @@ export default function DashboardTable() {
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     {listing.title}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {formatPrice(listing.price)}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {formatMiles(listing.miles)}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {listing.location || 'N/A'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {listing.source || 'N/A'}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     {new Date(listing.date).toLocaleDateString()}
@@ -118,7 +162,7 @@ export default function DashboardTable() {
                         ))}
                         {(filteredListings.length === 0 && !isLoading) && (
                             <tr>
-                                <td colSpan={4} className="px-6 py-8 text-center text-sm text-gray-500">
+                                <td colSpan={8} className="px-6 py-8 text-center text-sm text-gray-500">
                                     {listings.length === 0
                                         ? "No listings found. Click the refresh button to find vehicle listings."
                                         : "No listings match your search criteria."}
