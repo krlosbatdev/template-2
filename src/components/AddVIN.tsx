@@ -62,11 +62,27 @@ export default function AddVIN() {
         setLoading(true);
         setError(null);
 
-        // Simulate API call
-        setTimeout(() => {
-            setLoading(false);
+        try {
+            const response = await fetch('/api/vins', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to save VIN');
+            }
+
+            // Redirect to VINs list page after successful save
             router.push('/vins');
-        }, 1000);
+        } catch (err) {
+            setError('Failed to save VIN. Please try again.');
+            console.error('Error saving VIN:', err);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (

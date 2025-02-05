@@ -1,30 +1,49 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { VIN } from '@/types/vin';
 import Navbar from './Navbar';
 
 export default function VINList() {
-    const [vins, setVins] = useState<VIN[]>([
-        {
-            vin: '5YJ3E1EA7KF470984',
-            savedAt: '2024-03-15',
-            year: '2019',
-            make: 'Tesla',
-            model: 'Model 3'
-        },
-        {
-            vin: '2HGFC2F59LH500001',
-            savedAt: '2024-03-15',
-            year: '2020',
-            make: 'Honda',
-            model: 'Civic'
-        }
-    ]);
+    const [vins, setVins] = useState<VIN[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleDelete = (vinToDelete: string) => {
-        setVins(prevVins => prevVins.filter(v => v.vin !== vinToDelete));
+    useEffect(() => {
+        const fetchVins = async () => {
+            try {
+                const response = await fetch('/api/vins');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch VINs');
+                }
+                const data = await response.json();
+                setVins(data);
+            } catch (err) {
+                setError(err instanceof Error ? err.message : 'Failed to load VINs');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchVins();
+    }, []);
+
+    const handleDelete = async (vinToDelete: string) => {
+        try {
+            const response = await fetch(`/api/vins?vin=${vinToDelete}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to delete VIN');
+            }
+
+            setVins(prevVins => prevVins.filter(v => v.vin !== vinToDelete));
+        } catch (err) {
+            console.error('Error deleting VIN:', err);
+            alert('Failed to delete VIN. Please try again.');
+        }
     };
 
     return (
@@ -40,7 +59,13 @@ export default function VINList() {
                             <p className="text-sm text-gray-500">Vehicle Identification Numbers</p>
                         </div>
 
-                        {vins.length === 0 ? (
+                        {loading ? (
+                            <div className="flex justify-center py-8">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                            </div>
+                        ) : error ? (
+                            <div className="text-red-500 text-center py-8">{error}</div>
+                        ) : vins.length === 0 ? (
                             <div className="text-center py-8 text-gray-500">
                                 No VINs saved yet. Add your first VIN to get started.
                             </div>
@@ -54,9 +79,20 @@ export default function VINList() {
                                                 {vin.year} {vin.make} {vin.model}
                                             </p>
                                         </div>
-                                        <button className="text-gray-600">
-                                            Edit
-                                        </button>
+                                        <div className="flex items-center gap-4">
+                                            <Link
+                                                href={`/vins/edit/${vin.vin}`}
+                                                className="text-gray-600 hover:text-gray-900"
+                                            >
+                                                Edit
+                                            </Link>
+                                            <button
+                                                onClick={() => handleDelete(vin.vin)}
+                                                className="text-red-500 hover:text-red-700"
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
