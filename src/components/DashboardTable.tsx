@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { Spinner } from '@/app/components/Spinner'
 import { useAuth } from '@/lib/hooks/useAuth'
+import { db } from '@/lib/firebase/firebase'
+import { collection, query, getDocs } from 'firebase/firestore'
 
 interface ListingInfo {
     id: string
@@ -13,7 +15,6 @@ interface ListingInfo {
     price: number
     miles: number
     location: string
-    source: string
     seller: string
 }
 
@@ -23,15 +24,16 @@ export default function DashboardTable() {
     const [listings, setListings] = useState<ListingInfo[]>([])
     const [searchQuery, setSearchQuery] = useState('')
     const [error, setError] = useState<string | null>(null)
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
-    // Load initial data when component mounts
+    // Load cached data from Firebase when component mounts
     useEffect(() => {
         if (user) {
-            fetchListings(false)
+            loadCachedListings()
         }
     }, [user])
 
-    const fetchListings = async (refresh: boolean = false) => {
+    const loadCachedListings = async () => {
         if (!user) {
             setError('You must be logged in to view listings')
             return
@@ -40,34 +42,74 @@ export default function DashboardTable() {
         try {
             setIsLoading(true)
             setError(null)
-            const response = await fetch(`/api/listings/search${refresh ? '?refresh=true' : ''}`, {
+
+            // Get all listings documents from Firebase
+            const listingsRef = collection(db, 'listings')
+            const listingsSnapshot = await getDocs(listingsRef)
+
+            const allListings: ListingInfo[] = []
+            let latestUpdate: Date | null = null
+
+            // Combine listings from all documents
+            listingsSnapshot.forEach(doc => {
+                const data = doc.data()
+                if (Array.isArray(data.listings)) {
+                    allListings.push(...data.listings)
+                }
+
+                // Track the most recent update
+                if (data.lastUpdated) {
+                    const updateDate = new Date(data.lastUpdated)
+                    if (!latestUpdate || updateDate > latestUpdate) {
+                        latestUpdate = updateDate
+                    }
+                }
+            })
+
+            // Sort listings by VIN and date
+            const sortedListings = allListings.sort((a, b) => {
+                const vinCompare = a.vin.localeCompare(b.vin)
+                if (vinCompare !== 0) return vinCompare
+                return new Date(b.date).getTime() - new Date(a.date).getTime()
+            })
+
+            setListings(sortedListings)
+            setLastUpdated(latestUpdate)
+        } catch (error) {
+            console.error('Error loading listings:', error)
+            setError('Failed to load listings. Please try again.')
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const refreshListings = async () => {
+        if (!user) {
+            setError('You must be logged in to refresh listings')
+            return
+        }
+
+        try {
+            setIsLoading(true)
+            setError(null)
+            const response = await fetch('/api/listings/search?refresh=true', {
                 headers: {
                     'x-user-id': user.uid
                 }
             })
 
             if (!response.ok) {
-                throw new Error('Failed to fetch listings')
+                throw new Error('Failed to refresh listings')
             }
 
-            const data = await response.json()
-            // Sort listings by VIN first, then by date
-            const sortedData = data.sort((a: ListingInfo, b: ListingInfo) => {
-                const vinCompare = a.vin.localeCompare(b.vin)
-                if (vinCompare !== 0) return vinCompare
-                return new Date(b.date).getTime() - new Date(a.date).getTime()
-            })
-            setListings(sortedData)
+            // After refresh, load the updated data from Firebase
+            await loadCachedListings()
         } catch (error) {
-            console.error('Error fetching listings:', error)
-            setError('Failed to fetch listings. Please try again.')
+            console.error('Error refreshing listings:', error)
+            setError('Failed to refresh listings. Please try again.')
         } finally {
             setIsLoading(false)
         }
-    }
-
-    const searchListings = () => {
-        fetchListings(true) // Force refresh when button is clicked
     }
 
     const filteredListings = listings.filter(listing => {
@@ -111,7 +153,7 @@ export default function DashboardTable() {
 
     return (
         <div>
-            <div className="flex items-center gap-4 mb-4">
+            <div className="flex items-center justify-between gap-4 mb-4">
                 <div className="relative flex-1">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -127,8 +169,13 @@ export default function DashboardTable() {
                         placeholder="Search all listings"
                     />
                 </div>
+                {lastUpdated && (
+                    <div className="text-sm text-gray-500">
+                        Last updated: {lastUpdated.toLocaleString()}
+                    </div>
+                )}
                 <button
-                    onClick={searchListings}
+                    onClick={refreshListings}
                     disabled={isLoading}
                     className="flex items-center justify-center h-10 w-10 rounded-lg bg-slate-50 text-gray-900 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed ring-1 ring-inset ring-gray-100"
                     title="Refresh listings"
@@ -142,6 +189,12 @@ export default function DashboardTable() {
                     )}
                 </button>
             </div>
+
+            {error && (
+                <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-500 text-sm">
+                    {error}
+                </div>
+            )}
 
             <div className="rounded-xl border border-gray-100 overflow-hidden">
                 <div className="overflow-x-auto">
