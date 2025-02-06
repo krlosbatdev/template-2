@@ -1,51 +1,92 @@
 'use client'
 
-import { useState } from 'react'
-import { VIN } from '@/types/vin'
+import { useState, useEffect } from 'react'
 import { Spinner } from '@/app/components/Spinner'
+import { useAuth } from '@/lib/hooks/useAuth'
 
 interface ListingInfo {
+    id: string
     vin: string
     title: string
     date: string
-    url?: string | null
-    price?: number
-    miles?: number
-    location?: string
-    source?: string
+    url: string
+    price: number
+    miles: number
+    location: string
+    source: string
+    seller: string
 }
 
 export default function DashboardTable() {
+    const { user } = useAuth()
     const [isLoading, setIsLoading] = useState(false)
     const [listings, setListings] = useState<ListingInfo[]>([])
     const [searchQuery, setSearchQuery] = useState('')
+    const [error, setError] = useState<string | null>(null)
 
-    const searchListings = async () => {
+    // Load initial data when component mounts
+    useEffect(() => {
+        if (user) {
+            fetchListings(false)
+        }
+    }, [user])
+
+    const fetchListings = async (refresh: boolean = false) => {
+        if (!user) {
+            setError('You must be logged in to view listings')
+            return
+        }
+
         try {
             setIsLoading(true)
-            const response = await fetch('/api/listings/search', {
-                method: 'GET',
+            setError(null)
+            const response = await fetch(`/api/listings/search${refresh ? '?refresh=true' : ''}`, {
+                headers: {
+                    'x-user-id': user.uid
+                }
             })
+
             if (!response.ok) {
                 throw new Error('Failed to fetch listings')
             }
+
             const data = await response.json()
-            setListings(data)
+            // Sort listings by VIN first, then by date
+            const sortedData = data.sort((a: ListingInfo, b: ListingInfo) => {
+                const vinCompare = a.vin.localeCompare(b.vin)
+                if (vinCompare !== 0) return vinCompare
+                return new Date(b.date).getTime() - new Date(a.date).getTime()
+            })
+            setListings(sortedData)
         } catch (error) {
             console.error('Error fetching listings:', error)
+            setError('Failed to fetch listings. Please try again.')
         } finally {
             setIsLoading(false)
         }
     }
 
+    const searchListings = () => {
+        fetchListings(true) // Force refresh when button is clicked
+    }
+
     const filteredListings = listings.filter(listing => {
         const searchLower = searchQuery.toLowerCase()
         return listing.vin.toLowerCase().includes(searchLower) ||
-            listing.title.toLowerCase().includes(searchLower)
+            listing.title.toLowerCase().includes(searchLower) ||
+            listing.seller.toLowerCase().includes(searchLower)
     })
 
-    const formatPrice = (price?: number) => {
-        if (!price) return 'N/A'
+    // Group listings by VIN for alternate row coloring
+    const getRowClassName = (listing: ListingInfo, index: number) => {
+        if (index === 0) return 'hover:bg-slate-50'
+        const prevListing = filteredListings[index - 1]
+        const isNewVinGroup = prevListing.vin !== listing.vin
+        if (isNewVinGroup) return 'hover:bg-slate-50 border-t-2 border-gray-100'
+        return 'hover:bg-slate-50'
+    }
+
+    const formatPrice = (price: number) => {
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
             currency: 'USD',
@@ -53,9 +94,19 @@ export default function DashboardTable() {
         }).format(price)
     }
 
-    const formatMiles = (miles?: number) => {
-        if (!miles) return 'N/A'
+    const formatMiles = (miles: number) => {
         return new Intl.NumberFormat('en-US').format(miles) + ' mi'
+    }
+
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString)
+        return new Intl.DateTimeFormat('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }).format(date)
     }
 
     return (
@@ -93,61 +144,67 @@ export default function DashboardTable() {
             </div>
 
             <div className="rounded-xl border border-gray-100 overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-slate-50">
-                        <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                VIN
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Vehicle
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Price
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Miles
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Location
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Source
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Date
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Actions
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredListings.map((listing, index) => (
-                            <tr key={`${listing.vin}-${index}`} className="hover:bg-slate-50">
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    {listing.vin}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {listing.title}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {formatPrice(listing.price)}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {formatMiles(listing.miles)}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {listing.location || 'N/A'}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {listing.source || 'N/A'}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {new Date(listing.date).toLocaleDateString()}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {listing.url && (
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-slate-50">
+                            <tr>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                    VIN
+                                </th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                    Vehicle
+                                </th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                    Price
+                                </th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                    Miles
+                                </th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                    Location
+                                </th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                    Seller
+                                </th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                    Source
+                                </th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                    Last Seen
+                                </th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                    Actions
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {filteredListings.map((listing, index) => (
+                                <tr key={listing.id} className={getRowClassName(listing, index)}>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {listing.vin}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {listing.title}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {formatPrice(listing.price)}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {formatMiles(listing.miles)}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {listing.location}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {listing.seller}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {listing.source}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {formatDate(listing.date)}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         <a
                                             href={listing.url}
                                             target="_blank"
@@ -156,21 +213,21 @@ export default function DashboardTable() {
                                         >
                                             View Listing
                                         </a>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                        {(filteredListings.length === 0 && !isLoading) && (
-                            <tr>
-                                <td colSpan={8} className="px-6 py-8 text-center text-sm text-gray-500">
-                                    {listings.length === 0
-                                        ? "No listings found. Click the refresh button to find vehicle listings."
-                                        : "No listings match your search criteria."}
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+                                    </td>
+                                </tr>
+                            ))}
+                            {(filteredListings.length === 0 && !isLoading) && (
+                                <tr>
+                                    <td colSpan={9} className="px-6 py-8 text-center text-sm text-gray-500">
+                                        {listings.length === 0
+                                            ? "No listings found. Click the refresh button to find vehicle listings."
+                                            : "No listings match your search criteria."}
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     )
