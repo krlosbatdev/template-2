@@ -167,13 +167,7 @@ export default function DashboardTable() {
                                     Seller
                                 </th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                                    Source
-                                </th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                                     Last Seen
-                                </th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                                    Actions
                                 </th>
                             </tr>
                         </thead>
@@ -196,29 +190,23 @@ export default function DashboardTable() {
                                         {listing.location}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {listing.seller}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {listing.source}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {formatDate(listing.date)}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         <a
                                             href={listing.url}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="text-blue-600 hover:text-blue-800"
+                                            className="text-blue-600 hover:text-blue-800 hover:underline"
                                         >
-                                            View Listing
+                                            {listing.seller}
                                         </a>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {formatDate(listing.date)}
                                     </td>
                                 </tr>
                             ))}
                             {(filteredListings.length === 0 && !isLoading) && (
                                 <tr>
-                                    <td colSpan={9} className="px-6 py-8 text-center text-sm text-gray-500">
+                                    <td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">
                                         {listings.length === 0
                                             ? "No listings found. Click the refresh button to find vehicle listings."
                                             : "No listings match your search criteria."}

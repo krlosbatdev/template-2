@@ -75,7 +75,7 @@ export default function VINList() {
             ) : (
                 <div className="space-y-2">
                     {vins.map((vin) => (
-                        <div key={vin.id} className="flex items-center justify-between px-4 py-3">
+                        <div key={vin.id} className="flex items-center justify-between px-4 py-3 rounded-xl bg-slate-50">
                             <div>
                                 <p className="text-base font-medium text-gray-900">{vin.vin}</p>
                                 <p className="text-sm text-gray-500">
@@ -84,7 +84,7 @@ export default function VINList() {
                             </div>
                             <div className="flex items-center gap-4">
                                 <Link
-                                    href={`/vins/edit/${vin.vin}`}
+                                    href={`/vins/edit/${vin.id}`}
                                     className="text-gray-600 hover:text-gray-900"
                                 >
                                     Edit
