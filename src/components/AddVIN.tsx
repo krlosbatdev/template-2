@@ -4,9 +4,13 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { VINFormData } from '@/types/vin';
+import { db } from '@/lib/firebase/firebase';
+import { collection, addDoc } from 'firebase/firestore';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 export default function AddVIN() {
     const router = useRouter();
+    const { user } = useAuth();
     const [formData, setFormData] = useState<VINFormData>({
         vin: '',
         year: '',
@@ -58,27 +62,31 @@ export default function AddVIN() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!user) {
+            setError('You must be logged in to save a VIN');
+            return;
+        }
+
         setLoading(true);
         setError(null);
 
         try {
-            const response = await fetch('/api/vins', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData),
-            });
+            // Add VIN data to Firestore
+            const vinData = {
+                ...formData,
+                userId: user.uid,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
 
-            if (!response.ok) {
-                throw new Error('Failed to save VIN');
-            }
+            const vinsRef = collection(db, 'vins');
+            await addDoc(vinsRef, vinData);
 
             // Redirect to VINs list page after successful save
             router.push('/vins');
         } catch (err) {
-            setError('Failed to save VIN. Please try again.');
             console.error('Error saving VIN:', err);
+            setError('Failed to save VIN. Please try again.');
         } finally {
             setLoading(false);
         }

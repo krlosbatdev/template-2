@@ -3,22 +3,36 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { VIN } from '@/types/vin';
+import { db } from '@/lib/firebase/firebase';
+import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 export default function VINList() {
     const [vins, setVins] = useState<VIN[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const { user } = useAuth();
 
     useEffect(() => {
         const fetchVins = async () => {
+            if (!user) {
+                setLoading(false);
+                return;
+            }
+
             try {
-                const response = await fetch('/api/vins');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch VINs');
-                }
-                const data = await response.json();
-                setVins(data);
+                const vinsRef = collection(db, 'vins');
+                const q = query(vinsRef, where('userId', '==', user.uid));
+                const querySnapshot = await getDocs(q);
+
+                const vinData = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                })) as VIN[];
+
+                setVins(vinData);
             } catch (err) {
+                console.error('Error fetching VINs:', err);
                 setError(err instanceof Error ? err.message : 'Failed to load VINs');
             } finally {
                 setLoading(false);
@@ -26,19 +40,15 @@ export default function VINList() {
         };
 
         fetchVins();
-    }, []);
+    }, [user]);
 
-    const handleDelete = async (vinToDelete: string) => {
+    const handleDelete = async (vinId: string) => {
+        if (!user) return;
+
         try {
-            const response = await fetch(`/api/vins?vin=${vinToDelete}`, {
-                method: 'DELETE'
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to delete VIN');
-            }
-
-            setVins(prevVins => prevVins.filter(v => v.vin !== vinToDelete));
+            const vinRef = doc(db, 'vins', vinId);
+            await deleteDoc(vinRef);
+            setVins(prevVins => prevVins.filter(v => v.id !== vinId));
         } catch (err) {
             console.error('Error deleting VIN:', err);
             alert('Failed to delete VIN. Please try again.');
@@ -65,7 +75,7 @@ export default function VINList() {
             ) : (
                 <div className="space-y-2">
                     {vins.map((vin) => (
-                        <div key={vin.vin} className="flex items-center justify-between px-4 py-3">
+                        <div key={vin.id} className="flex items-center justify-between px-4 py-3">
                             <div>
                                 <p className="text-base font-medium text-gray-900">{vin.vin}</p>
                                 <p className="text-sm text-gray-500">
@@ -80,7 +90,7 @@ export default function VINList() {
                                     Edit
                                 </Link>
                                 <button
-                                    onClick={() => handleDelete(vin.vin)}
+                                    onClick={() => handleDelete(vin.id)}
                                     className="text-red-500 hover:text-red-700"
                                 >
                                     Delete
