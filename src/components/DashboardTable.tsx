@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Spinner } from '@/app/components/Spinner'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { db } from '@/lib/firebase/firebase'
-import { collection, query, getDocs } from 'firebase/firestore'
+import { collection, query, getDocs, where, getDoc, deleteDoc, doc } from 'firebase/firestore'
 
 interface ListingInfo {
     id: string
@@ -43,28 +43,39 @@ export default function DashboardTable() {
             setIsLoading(true)
             setError(null)
 
-            // Get all listings documents from Firebase
-            const listingsRef = collection(db, 'listings')
-            const listingsSnapshot = await getDocs(listingsRef)
+            // Get user's VINs
+            const vinsRef = collection(db, 'vins')
+            const vinsQuery = query(vinsRef, where('userId', '==', user.uid))
+            const vinsSnapshot = await getDocs(vinsQuery)
+            const userVins = vinsSnapshot.docs.map(doc => doc.data().vin)
+
+            if (userVins.length === 0) {
+                setListings([])
+                setLastUpdated(null)
+                return
+            }
 
             const allListings: ListingInfo[] = []
             let latestUpdate: Date | null = null
 
-            // Combine listings from all documents
-            listingsSnapshot.forEach(doc => {
-                const data = doc.data()
-                if (Array.isArray(data.listings)) {
-                    allListings.push(...data.listings)
-                }
+            // Get listings for each of the user's VINs
+            for (const vin of userVins) {
+                const listingDoc = await getDoc(doc(db, 'listings', vin))
+                if (listingDoc.exists()) {
+                    const data = listingDoc.data()
+                    if (Array.isArray(data.listings)) {
+                        allListings.push(...data.listings)
+                    }
 
-                // Track the most recent update
-                if (data.lastUpdated) {
-                    const updateDate = new Date(data.lastUpdated)
-                    if (!latestUpdate || updateDate > latestUpdate) {
-                        latestUpdate = updateDate
+                    // Track the most recent update
+                    if (data.lastUpdated) {
+                        const updateDate = new Date(data.lastUpdated)
+                        if (!latestUpdate || updateDate > latestUpdate) {
+                            latestUpdate = updateDate
+                        }
                     }
                 }
-            })
+            }
 
             // Sort listings by VIN and date
             const sortedListings = allListings.sort((a, b) => {
@@ -92,6 +103,8 @@ export default function DashboardTable() {
         try {
             setIsLoading(true)
             setError(null)
+
+            // Fetch fresh listings with refresh flag
             const response = await fetch('/api/listings/search?refresh=true', {
                 headers: {
                     'x-user-id': user.uid
@@ -102,7 +115,7 @@ export default function DashboardTable() {
                 throw new Error('Failed to refresh listings')
             }
 
-            // After refresh, load the updated data from Firebase
+            // Load the updated listings
             await loadCachedListings()
         } catch (error) {
             console.error('Error refreshing listings:', error)

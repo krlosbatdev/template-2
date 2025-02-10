@@ -11,4 +11,5 @@ export interface VIN extends VINFormData {
     userId: string;
     createdAt: string;
     updatedAt: string;
+    savedAt: string;
 } 

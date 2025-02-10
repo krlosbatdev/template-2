@@ -36,7 +36,7 @@ interface ListingsDocument extends DocumentData {
 
 function cleanListingData(listing: ListingHistory, vinData: any): ProcessedListing {
     return {
-        id: listing.id || `${vinData.vin}-${Date.now()}`, // Fallback ID if none exists
+        id: listing.id || `${vinData.vin}-${Date.now()}`,
         vin: vinData.vin,
         title: `${vinData.year || 'N/A'} ${vinData.make || 'N/A'} ${vinData.model || 'N/A'}`.trim(),
         date: listing.last_seen_at_date,
@@ -86,79 +86,6 @@ async function getVehicleHistory(vin: string): Promise<ListingHistory[]> {
     })
 }
 
-async function processAndSaveListings(userId: string, forceRefresh: boolean = false): Promise<ProcessedListing[]> {
-    // Get all VINs from Firebase for the current user
-    const vinsRef = collection(db, 'vins')
-    const vinsQuery = query(vinsRef, where('userId', '==', userId))
-    const querySnapshot = await getDocs(vinsQuery)
-    const allListings: ProcessedListing[] = []
-
-    // Get the listings collection reference
-    const listingsRef = collection(db, 'listings')
-
-    // If refreshing, delete all existing listings for user's VINs
-    if (forceRefresh) {
-        for (const docSnapshot of querySnapshot.docs) {
-            const vinData = docSnapshot.data()
-            const vinListingsDocRef = doc(db, 'listings', vinData.vin)
-            try {
-                await deleteDoc(vinListingsDocRef)
-            } catch (error) {
-                console.error(`Error deleting listings for VIN ${vinData.vin}:`, error)
-            }
-        }
-    }
-
-    // Fetch history for each VIN
-    for (const docSnapshot of querySnapshot.docs) {
-        const vinData = docSnapshot.data()
-        const vinListingsDocRef = doc(db, 'listings', vinData.vin)
-
-        // Only check cached listings if not refreshing
-        if (!forceRefresh) {
-            const vinListingsDoc = await getDoc(vinListingsDocRef)
-            if (vinListingsDoc.exists()) {
-                const data = vinListingsDoc.data() as ListingsDocument
-                if (Array.isArray(data.listings)) {
-                    allListings.push(...data.listings)
-                }
-                continue
-            }
-        }
-
-        try {
-            const historyData = await getVehicleHistory(vinData.vin)
-
-            // Process each listing in the history
-            const listings = historyData
-                .filter(listing => listing && typeof listing === 'object') // Ensure valid listing objects
-                .map(listing => cleanListingData(listing, vinData))
-                .filter(listing => listing.id && listing.date) // Ensure required fields exist
-
-            if (listings.length > 0) {
-                // Save the listings for this VIN to Firebase
-                const docData = {
-                    listings,
-                    lastUpdated: new Date().toISOString()
-                }
-
-                try {
-                    await setDoc(vinListingsDocRef, docData)
-                    allListings.push(...listings)
-                } catch (error) {
-                    console.error(`Error saving listings for VIN ${vinData.vin}:`, error)
-                }
-            }
-        } catch (error) {
-            console.error(`Error fetching history for VIN ${vinData.vin}:`, error)
-            continue
-        }
-    }
-
-    // Sort all listings by date (newest first)
-    return allListings.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-}
-
 export async function GET(request: Request) {
     try {
         const headersList = headers()
@@ -174,8 +101,71 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url)
         const refresh = searchParams.get('refresh') === 'true'
 
-        const allListings = await processAndSaveListings(userId, refresh)
-        return NextResponse.json(allListings)
+        // Get only the VINs belonging to the current user
+        const vinsRef = collection(db, 'vins')
+        const vinsQuery = query(vinsRef, where('userId', '==', userId))
+        const vinsSnapshot = await getDocs(vinsQuery)
+        const userVinDocs = vinsSnapshot.docs
+
+        if (userVinDocs.length === 0) {
+            return NextResponse.json([])
+        }
+
+        const listingsRef = collection(db, 'listings')
+        const allListings: ProcessedListing[] = []
+
+        // If refreshing, fetch new data for each VIN
+        if (refresh) {
+            for (const vinDoc of userVinDocs) {
+                const vinData = vinDoc.data()
+                const vinListingsRef = doc(listingsRef, vinData.vin)
+
+                try {
+                    // Delete existing listings
+                    await deleteDoc(vinListingsRef)
+
+                    // Fetch new listings from Marketcheck
+                    const historyData = await getVehicleHistory(vinData.vin)
+                    console.log(`Fetched ${historyData.length} history records for VIN ${vinData.vin}`)
+
+                    // Process and save new listings
+                    const listings = historyData
+                        .filter(listing => listing && typeof listing === 'object')
+                        .map(listing => cleanListingData(listing, vinData))
+                        .filter(listing => listing.id && listing.date)
+
+                    if (listings.length > 0) {
+                        await setDoc(vinListingsRef, {
+                            listings,
+                            lastUpdated: new Date().toISOString()
+                        })
+                        allListings.push(...listings)
+                    }
+                } catch (error) {
+                    console.error(`Error processing VIN ${vinData.vin}:`, error)
+                    continue
+                }
+            }
+        } else {
+            // Just load existing listings
+            for (const vinDoc of userVinDocs) {
+                const vinData = vinDoc.data()
+                const listingDoc = await getDoc(doc(listingsRef, vinData.vin))
+                if (listingDoc.exists()) {
+                    const data = listingDoc.data() as ListingsDocument
+                    if (Array.isArray(data.listings)) {
+                        allListings.push(...data.listings)
+                    }
+                }
+            }
+        }
+
+        // Sort all listings by date (newest first)
+        const sortedListings = allListings.sort((a, b) =>
+            new Date(b.date).getTime() - new Date(a.date).getTime()
+        )
+
+        return NextResponse.json(sortedListings)
     } catch (error) {
         console.error('Error searching listings:', error)
         return NextResponse.json(

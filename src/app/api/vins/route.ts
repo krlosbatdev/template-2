@@ -1,53 +1,119 @@
 import { NextResponse } from 'next/server';
 import { VIN } from '@/types/vin';
+import { headers } from 'next/headers';
+import { db } from '@/lib/firebase/firebase';
+import { collection, query, where, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
 
-// In a real app, this would be a database
-let savedVins: VIN[] = [];
+export async function GET(request: Request) {
+    try {
+        const headersList = headers()
+        const userId = headersList.get('x-user-id')
 
-export async function GET() {
-    return NextResponse.json(savedVins);
+        if (!userId) {
+            return NextResponse.json(
+                { error: 'Unauthorized' },
+                { status: 401 }
+            )
+        }
+
+        const vinsRef = collection(db, 'vins');
+        const q = query(vinsRef, where('userId', '==', userId));
+        const querySnapshot = await getDocs(q);
+
+        const vins = querySnapshot.docs.map(doc => ({
+            ...doc.data(),
+            id: doc.id
+        })) as VIN[];
+
+        return NextResponse.json(vins);
+    } catch (error) {
+        console.error('Error fetching VINs:', error);
+        return NextResponse.json(
+            { error: 'Failed to fetch VINs' },
+            { status: 500 }
+        );
+    }
 }
 
 export async function POST(request: Request) {
-    const data = await request.json();
+    try {
+        const headersList = headers()
+        const userId = headersList.get('x-user-id')
 
-    if (!data.vin) {
-        return NextResponse.json({ error: 'VIN is required' }, { status: 400 });
+        if (!userId) {
+            return NextResponse.json(
+                { error: 'Unauthorized' },
+                { status: 401 }
+            )
+        }
+
+        const data = await request.json()
+
+        if (!data.vin) {
+            return NextResponse.json({ error: 'VIN is required' }, { status: 400 });
+        }
+
+        const timestamp = new Date().toISOString()
+        const vinData = {
+            userId,
+            vin: data.vin,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+            savedAt: timestamp,
+            year: data.year || '',
+            make: data.make || '',
+            model: data.model || '',
+            color: data.color || ''
+        }
+
+        // Add to Firestore
+        const vinsRef = collection(db, 'vins');
+        const docRef = await addDoc(vinsRef, vinData);
+
+        const newVin: VIN = {
+            ...vinData,
+            id: docRef.id
+        }
+
+        return NextResponse.json(newVin);
+    } catch (error) {
+        console.error('Error adding VIN:', error)
+        return NextResponse.json(
+            { error: 'Failed to add VIN' },
+            { status: 500 }
+        )
     }
-
-    const newVin: VIN = {
-        vin: data.vin,
-        savedAt: new Date().toISOString(),
-        year: data.year,
-        make: data.make,
-        model: data.model,
-        color: data.color
-    };
-
-    // Check if VIN already exists
-    const existingVinIndex = savedVins.findIndex(v => v.vin === data.vin);
-    if (existingVinIndex !== -1) {
-        savedVins[existingVinIndex] = newVin;
-    } else {
-        savedVins.push(newVin);
-    }
-
-    return NextResponse.json(newVin);
 }
 
 export async function DELETE(request: Request) {
-    const { searchParams } = new URL(request.url);
-    const vin = searchParams.get('vin');
+    try {
+        const headersList = headers()
+        const userId = headersList.get('x-user-id')
 
-    if (!vin) {
-        return NextResponse.json({ error: 'VIN is required' }, { status: 400 });
+        if (!userId) {
+            return NextResponse.json(
+                { error: 'Unauthorized' },
+                { status: 401 }
+            )
+        }
+
+        const { searchParams } = new URL(request.url);
+        const vinId = searchParams.get('id');
+
+        if (!vinId) {
+            return NextResponse.json({ error: 'VIN ID is required' }, { status: 400 });
+        }
+
+        // Delete from Firestore
+        const vinRef = doc(db, 'vins', vinId);
+        await deleteDoc(vinRef);
+
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting VIN:', error);
+        return NextResponse.json(
+            { error: 'Failed to delete VIN' },
+            { status: 500 }
+        );
     }
-
-    const vinIndex = savedVins.findIndex(v => v.vin === vin);
-    if (vinIndex === -1) {
-        return NextResponse.json({ error: 'VIN not found' }, { status: 404 });
-    }
-
-    savedVins = savedVins.filter(v => v.vin !== vin);
-    return NextResponse.json({ success: true });
 } 
